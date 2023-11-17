@@ -4,6 +4,9 @@ from PyQt6.QtGui import QIntValidator
 from pynput.mouse import Listener
 import mss
 import pyautogui
+import time
+from datetime import datetime
+import os
 
 
 class MainWindow(QMainWindow):
@@ -15,7 +18,7 @@ class MainWindow(QMainWindow):
 
 ############################################위젯##############################################
         # 제목
-        self.label_title = QLabel('Ebook To PDf')
+        self.label_title = QLabel('Ebook To PDF')
         font_label_title = self.label_title.font()
         font_label_title.setPointSize(26)
         self.label_title.setFont(font_label_title)
@@ -46,8 +49,12 @@ class MainWindow(QMainWindow):
 
 
         # 캡처 속도 조절
-        self.label_captureSpeed = QLabel('캡쳐 속도: 0.1초')
+        self.captureSpeed = 0
+        self.label_captureSpeedText = QLabel('캡쳐 속도:')
+        self.label_captureSpeed = QLabel('{}'.format(self.captureSpeed))
         self.slider_captureSpeed = QSlider(Qt.Orientation.Horizontal)
+        self.slider_captureSpeed.setRange(0, 100)
+        self.slider_captureSpeed.setSingleStep(1)
 
         # 캡처 시작 버튼
         self.btn_captureStart = QPushButton('캡처 시작')
@@ -99,6 +106,7 @@ class MainWindow(QMainWindow):
         layout_filename.addWidget(self.input_filename)
 
         layout_main.addLayout(layout_captureSpeed)
+        layout_captureSpeed.addWidget(self.label_captureSpeedText)
         layout_captureSpeed.addWidget(self.label_captureSpeed)
         layout_captureSpeed.addWidget(self.slider_captureSpeed)
 
@@ -115,6 +123,7 @@ class MainWindow(QMainWindow):
 ############################################시그널##############################################
         self.btn_coord1.clicked.connect(self.set_coord1)
         self.btn_coord2.clicked.connect(self.set_coord2)
+        self.slider_captureSpeed.valueChanged.connect(self.set_captureSpeed)
         self.btn_captureStart.clicked.connect(self.captureStart)
 
 
@@ -130,21 +139,47 @@ class MainWindow(QMainWindow):
         self.coord2 = coord
         self.label_coord2.setText('({x:.2f}, {y:.2f})'.format(x = self.coord2['x'], y = self.coord2['y']))
 
+    def set_captureSpeed(self):
+        self.captureSpeed = self.slider_captureSpeed.value() / 10
+        self.label_captureSpeed.setText('{}'.format(self.captureSpeed))
+
     def captureStart(self):
         top = self.coord1['y']
         left = self.coord1['x']
         width = self.coord2['x'] - self.coord1['x']
         height = self.coord2['y'] - self.coord1['y']
 
+        # 캡처 위치 다시 클릭해주기
         pyautogui.click(left + width / 2, top + height / 2)
 
-        for _ in range(2):
+        num_pages = int(self.input_numPage.text())
+
+        for i in range(num_pages):
             with mss.mss() as sct:
                 monitor = {"top": top, "left": left, "width": width, "height": height}
-                output = "test.png"
+
+                # 파일명 현재 시간으로 설정.
+                current_time = datetime.now().strftime("%y%m%d%y%H%M%S%f")
+                filename = current_time
+                file_ext = '.png'
+                output = filename + file_ext
+                
+                # (혹시라도) 이미 파일명 존재할 경우
+                uniq = 1
+                while os.path.exists(output):
+                    output = filename + '({})'.format(uniq) + file_ext
+                    uniq += 1
+
                 sct_img = sct.grab(monitor)
                 mss.tools.to_png(sct_img.rgb, sct_img.size, output=output)
-            pyautogui.press('down')
+
+            # 마지막 페이지에서 종료
+            if i == num_pages - 1:
+                break
+
+            pyautogui.press('right')
+            if self.captureSpeed != 0:
+                time.sleep(self.captureSpeed)
 
 
 def get_coord():
