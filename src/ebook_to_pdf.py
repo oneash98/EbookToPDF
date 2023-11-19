@@ -8,7 +8,8 @@ import time
 from datetime import datetime
 import os
 from pathlib import Path
-
+import natsort
+from PIL import Image
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -40,14 +41,27 @@ class MainWindow(QMainWindow):
         # 페이지 수
         self.label_numPage = QLabel('총 페이지 수')
         self.input_numPage = QLineEdit()
-        self.input_numPage.setPlaceholderText('총 페이지 수 입력')
+        self.input_numPage.setPlaceholderText('페이지 수')
         self.input_numPage.setValidator(QIntValidator())
 
         # 넘기는 방향
         self.flipDir = 'right'
         self.label_flipDir = QLabel('넘기는 방향')
         self.combo_flipDir = QComboBox()
-        self.combo_flipDir.addItems(['오른쪽', '왼쪽', '위', '아래'])
+        self.combo_flipDir.addItems(['오른쪽', '아래'])
+
+        # 분할 여부
+        self.label_divide = QLabel('페이지 분할')
+        self.combo_divide = QComboBox()
+        self.combo_divide.addItems(['한 번에', '절반씩'])
+
+        # 캡처 속도 조절
+        self.captureSpeed = 0
+        self.label_captureSpeedText = QLabel('캡쳐 속도:')
+        self.label_captureSpeed = QLabel('{}'.format(self.captureSpeed))
+        self.slider_captureSpeed = QSlider(Qt.Orientation.Horizontal)
+        self.slider_captureSpeed.setRange(0, 100)
+        self.slider_captureSpeed.setSingleStep(1)
 
         # 파일명
         self.label_filename = QLabel('파일명')
@@ -59,14 +73,6 @@ class MainWindow(QMainWindow):
         self.saveDir = QLineEdit('~')
         self.saveDir.setReadOnly(True)
         self.btn_saveDir = QPushButton('저장 위치 선택')
-
-        # 캡처 속도 조절
-        self.captureSpeed = 0
-        self.label_captureSpeedText = QLabel('캡쳐 속도:')
-        self.label_captureSpeed = QLabel('{}'.format(self.captureSpeed))
-        self.slider_captureSpeed = QSlider(Qt.Orientation.Horizontal)
-        self.slider_captureSpeed.setRange(0, 100)
-        self.slider_captureSpeed.setSingleStep(1)
 
         # 캡처 시작 버튼
         self.btn_captureStart = QPushButton('캡처 시작')
@@ -92,9 +98,9 @@ class MainWindow(QMainWindow):
         layout_coord1 = QHBoxLayout()
         layout_coord2 = QHBoxLayout()
         layout_page = QHBoxLayout()
+        layout_captureSpeed = QHBoxLayout()
         layout_filename = QHBoxLayout()
         layout_savedir = QHBoxLayout()
-        layout_captureSpeed = QHBoxLayout()
 
 
         # Layout 설정
@@ -118,6 +124,13 @@ class MainWindow(QMainWindow):
         layout_page.addWidget(self.input_numPage)
         layout_page.addWidget(self.label_flipDir)
         layout_page.addWidget(self.combo_flipDir)
+        layout_page.addWidget(self.label_divide)
+        layout_page.addWidget(self.combo_divide)
+
+        layout_main.addLayout(layout_captureSpeed)
+        layout_captureSpeed.addWidget(self.label_captureSpeedText)
+        layout_captureSpeed.addWidget(self.label_captureSpeed)
+        layout_captureSpeed.addWidget(self.slider_captureSpeed)
 
         layout_main.addLayout(layout_filename)
         layout_filename.addWidget(self.label_filename)
@@ -127,11 +140,6 @@ class MainWindow(QMainWindow):
         layout_savedir.addWidget(self.label_saveDir)
         layout_savedir.addWidget(self.saveDir)
         layout_savedir.addWidget(self.btn_saveDir)
-
-        layout_main.addLayout(layout_captureSpeed)
-        layout_captureSpeed.addWidget(self.label_captureSpeedText)
-        layout_captureSpeed.addWidget(self.label_captureSpeed)
-        layout_captureSpeed.addWidget(self.slider_captureSpeed)
 
         layout_main.addWidget(self.btn_captureStart)
         layout_main.addWidget(self.btn_init)
@@ -174,10 +182,6 @@ class MainWindow(QMainWindow):
         text = self.combo_flipDir.currentText()
         if text == '오른쪽':
             self.flipDir = 'right'
-        elif text == '왼쪽':
-            self.flipDir = 'left'
-        elif text == '위':
-            self.flipDir = 'up'
         elif text == '아래':
             self.flipDir = 'down'
         
@@ -196,7 +200,7 @@ class MainWindow(QMainWindow):
             num_pages = int(self.input_numPage.text())
         except ValueError as e:
             return self.warning_numPage()
-           
+
         top = self.coord1['y']
         left = self.coord1['x']
         width = self.coord2['x'] - self.coord1['x']
@@ -205,36 +209,55 @@ class MainWindow(QMainWindow):
         # 캡처 위치 다시 클릭해주기
         pyautogui.click(left + width / 2, top + height / 2)
 
+        # 경로 생성
         dir = Path(self.saveDir.text()) / 'capture_{}'.format(datetime.now().strftime("%y%m%d%H%M%S"))
         dir.mkdir()
         images_dir = dir / 'images'
         images_dir.mkdir()
 
+        # 화면 캡처
         for i in range(num_pages):
-            with mss.mss() as sct:
-                monitor = {"top": top, "left": left, "width": width, "height": height}
+            if self.combo_divide.currentText() == '한 번에':
+                capture(top, left, width, height, images_dir)
 
-                # 파일명 현재 시간으로 설정.
-                current_time = datetime.now().strftime("%y%m%d%H%M%S%f")
-                file_ext = '.png'
-                output = images_dir / (current_time + file_ext)
-                
-                # (혹시라도) 이미 파일명 존재할 경우
-                uniq = 1
-                while os.path.exists(output):
-                    output =  images_dir / (current_time + '({})'.format(uniq) + file_ext)
-                    uniq += 1
+            elif self.combo_divide.currentText() == '절반씩':
+                capture(top, left, width / 2, height, images_dir) # 왼쪽 절반
+                capture(top, left + width / 2, width / 2, height, images_dir) # 오른쪽 절반
 
-                sct_img = sct.grab(monitor)
-                mss.tools.to_png(sct_img.rgb, sct_img.size, output=output)
+            # 페이지 넘기기
+            if i != num_pages - 1:
+                pyautogui.press(self.flipDir)
+                if self.captureSpeed != 0:
+                    time.sleep(self.captureSpeed)
 
-            # 마지막 페이지에서 종료
-            if i == num_pages - 1:
-                break
+        # pdf 변환
+        file_list = os.listdir(images_dir)
+        file_list = natsort.natsorted(file_list)
+        if '.DS_Store' in file_list:
+            del file_list[0]
 
-            pyautogui.press(self.flipDir)
-            if self.captureSpeed != 0:
-                time.sleep(self.captureSpeed)
+        images_list = []
+        image_path = images_dir / file_list[0]
+        image_buf = Image.open(image_path)
+        cvt_rgb_0 = image_buf.convert('RGB')
+
+        for file in file_list:
+            image_path = images_dir / file
+            image_buf = Image.open(image_path)
+            cvt_rgb = image_buf.convert('RGB')
+            images_list.append(cvt_rgb)
+        del images_list[0]
+
+        file_name = self.input_filename.text()
+        if file_name == '':
+            file_name = '무제'
+
+        cvt_rgb_0.save(dir / (file_name + '.pdf'), save_all = True, append_images = images_list)
+
+        # 변환 완료 창
+        QMessageBox.information(self, '변환 완료', 'PDF 변환이 완료되었습니다.')
+
+
 
     # 페이지 수 입력 경고
     def warning_numPage(self):
@@ -246,9 +269,10 @@ class MainWindow(QMainWindow):
         self.set_coord2(0, 0)
         self.input_numPage.clear()
         self.combo_flipDir.setCurrentIndex(0)
+        self.combo_divide.setCurrentIndex(0)
+        self.slider_captureSpeed.setValue(0)
         self.input_filename.clear()
         self.saveDir.setText('~')
-        self.slider_captureSpeed.setValue(0)
 
 
 def get_coord():
@@ -261,6 +285,26 @@ def get_coord():
         listener.join()
     return coord
 
+def make_filename(dir):
+    # 파일명 현재 시간으로 설정.
+    current_time = datetime.now().strftime("%y%m%d%H%M%S%f")
+    file_ext = '.png'
+    output = dir / (current_time + file_ext)
+
+    # (혹시라도) 이미 파일명 존재할 경우
+    uniq = 1
+    while os.path.exists(output):
+        output =  dir / (current_time + '({})'.format(uniq) + file_ext)
+        uniq += 1
+
+    return output
+
+def capture(top, left, width, height, images_dir):
+    with mss.mss() as sct:
+        monitor = {"top": top, "left": left, "width": width, "height": height}
+        output = make_filename(images_dir)
+        sct_img = sct.grab(monitor)
+        mss.tools.to_png(sct_img.rgb, sct_img.size, output=output)
             
 
 
