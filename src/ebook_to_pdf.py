@@ -43,12 +43,19 @@ class MainWindow(QMainWindow):
         self.input_numPage.setPlaceholderText('총 페이지 수 입력')
         self.input_numPage.setValidator(QIntValidator())
 
+        # 넘기는 방향
+        self.flipDir = 'right'
+        self.label_flipDir = QLabel('넘기는 방향')
+        self.combo_flipDir = QComboBox()
+        self.combo_flipDir.addItems(['오른쪽', '왼쪽', '위', '아래'])
+
         # 파일명
         self.label_filename = QLabel('파일명')
         self.input_filename = QLineEdit()
         self.input_filename.setPlaceholderText('파일명 입력')
 
-        # 파일 경로
+        # 저장 경로
+        self.label_saveDir = QLabel('저장 경로')
         self.saveDir = QLineEdit('~')
         self.saveDir.setReadOnly(True)
         self.btn_saveDir = QPushButton('저장 위치 선택')
@@ -84,9 +91,9 @@ class MainWindow(QMainWindow):
         # 메인 layout 내부 layouts
         layout_coord1 = QHBoxLayout()
         layout_coord2 = QHBoxLayout()
-        layout_numPage = QHBoxLayout()
+        layout_page = QHBoxLayout()
         layout_filename = QHBoxLayout()
-        layout_filedir = QHBoxLayout()
+        layout_savedir = QHBoxLayout()
         layout_captureSpeed = QHBoxLayout()
 
 
@@ -106,17 +113,20 @@ class MainWindow(QMainWindow):
         layout_coord2.addWidget(self.label_coord2)
         layout_coord2.addWidget(self.btn_coord2)
 
-        layout_main.addLayout(layout_numPage)
-        layout_numPage.addWidget(self.label_numPage)
-        layout_numPage.addWidget(self.input_numPage)
+        layout_main.addLayout(layout_page)
+        layout_page.addWidget(self.label_numPage)
+        layout_page.addWidget(self.input_numPage)
+        layout_page.addWidget(self.label_flipDir)
+        layout_page.addWidget(self.combo_flipDir)
 
         layout_main.addLayout(layout_filename)
         layout_filename.addWidget(self.label_filename)
         layout_filename.addWidget(self.input_filename)
 
-        layout_main.addLayout(layout_filedir)
-        layout_filedir.addWidget(self.saveDir)
-        layout_filedir.addWidget(self.btn_saveDir)
+        layout_main.addLayout(layout_savedir)
+        layout_savedir.addWidget(self.label_saveDir)
+        layout_savedir.addWidget(self.saveDir)
+        layout_savedir.addWidget(self.btn_saveDir)
 
         layout_main.addLayout(layout_captureSpeed)
         layout_captureSpeed.addWidget(self.label_captureSpeedText)
@@ -137,6 +147,7 @@ class MainWindow(QMainWindow):
 ############################################시그널##############################################
         self.btn_coord1.clicked.connect(lambda: self.set_coord1())
         self.btn_coord2.clicked.connect(lambda: self.set_coord2())
+        self.combo_flipDir.currentIndexChanged.connect(self.set_flipDir)
         self.slider_captureSpeed.valueChanged.connect(self.set_captureSpeed)
         self.btn_saveDir.clicked.connect(self.findDir)
         self.btn_captureStart.clicked.connect(self.captureStart)
@@ -159,6 +170,17 @@ class MainWindow(QMainWindow):
         self.coord2 = coord
         self.label_coord2.setText('({x:.2f}, {y:.2f})'.format(x = coord['x'], y = coord['y']))
 
+    def set_flipDir(self):
+        text = self.combo_flipDir.currentText()
+        if text == '오른쪽':
+            self.flipDir = 'right'
+        elif text == '왼쪽':
+            self.flipDir = 'left'
+        elif text == '위':
+            self.flipDir = 'up'
+        elif text == '아래':
+            self.flipDir = 'down'
+        
     def set_captureSpeed(self):
         self.captureSpeed = self.slider_captureSpeed.value() / 10
         self.label_captureSpeed.setText('{}'.format(self.captureSpeed))
@@ -210,7 +232,7 @@ class MainWindow(QMainWindow):
             if i == num_pages - 1:
                 break
 
-            pyautogui.press('right')
+            pyautogui.press(self.flipDir)
             if self.captureSpeed != 0:
                 time.sleep(self.captureSpeed)
 
@@ -223,10 +245,10 @@ class MainWindow(QMainWindow):
         self.set_coord1(0, 0)
         self.set_coord2(0, 0)
         self.input_numPage.clear()
+        self.combo_flipDir.setCurrentIndex(0)
         self.input_filename.clear()
         self.saveDir.setText('~')
         self.slider_captureSpeed.setValue(0)
-
 
 
 def get_coord():
