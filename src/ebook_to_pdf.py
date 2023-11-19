@@ -210,7 +210,10 @@ class MainWindow(QMainWindow):
         pyautogui.click(left + width / 2, top + height / 2)
 
         # 경로 생성
-        dir = Path(self.saveDir.text()) / 'capture_{}'.format(datetime.now().strftime("%y%m%d%H%M%S"))
+        file_name = self.input_filename.text()
+        if file_name == '':
+            file_name = '무제'
+        dir = Path(self.saveDir.text()) / (file_name + datetime.now().strftime("%y%m%d%H%M%S"))
         dir.mkdir()
         images_dir = dir / 'images'
         images_dir.mkdir()
@@ -248,13 +251,9 @@ class MainWindow(QMainWindow):
             images_list.append(cvt_rgb)
         del images_list[0]
 
-        file_name = self.input_filename.text()
-        if file_name == '':
-            file_name = '무제'
-
         cvt_rgb_0.save(dir / (file_name + '.pdf'), save_all = True, append_images = images_list)
 
-        # 변환 완료 창
+        # 변환 완료 창1
         QMessageBox.information(self, '변환 완료', 'PDF 변환이 완료되었습니다.')
 
 
