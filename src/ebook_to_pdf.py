@@ -7,6 +7,7 @@ import pyautogui
 import time
 from datetime import datetime
 import os
+from pathlib import Path
 
 
 class MainWindow(QMainWindow):
@@ -182,20 +183,24 @@ class MainWindow(QMainWindow):
         # 캡처 위치 다시 클릭해주기
         pyautogui.click(left + width / 2, top + height / 2)
 
+        dir = Path(self.saveDir.text()) / 'capture_{}'.format(datetime.now().strftime("%y%m%d%H%M%S"))
+        dir.mkdir()
+        images_dir = dir / 'images'
+        images_dir.mkdir()
+
         for i in range(num_pages):
             with mss.mss() as sct:
                 monitor = {"top": top, "left": left, "width": width, "height": height}
 
                 # 파일명 현재 시간으로 설정.
-                current_time = datetime.now().strftime("%y%m%d%y%H%M%S%f")
-                filename = current_time
+                current_time = datetime.now().strftime("%y%m%d%H%M%S%f")
                 file_ext = '.png'
-                output = filename + file_ext
+                output = images_dir / (current_time + file_ext)
                 
                 # (혹시라도) 이미 파일명 존재할 경우
                 uniq = 1
                 while os.path.exists(output):
-                    output = filename + '({})'.format(uniq) + file_ext
+                    output =  images_dir / (current_time + '({})'.format(uniq) + file_ext)
                     uniq += 1
 
                 sct_img = sct.grab(monitor)
