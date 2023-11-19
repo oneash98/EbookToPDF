@@ -14,7 +14,7 @@ class MainWindow(QMainWindow):
         super(MainWindow, self).__init__()
         
         self.setWindowTitle("EBook To PDF")
-        self.setFixedSize(480, 320)
+        self.setFixedSize(480, 400)
 
 ############################################위젯##############################################
         # 제목
@@ -26,14 +26,14 @@ class MainWindow(QMainWindow):
         
         
         # 좌표
-        self.coord1 = {'x': 0, 'y': 0}
+        self.coord1 = {'x': 0.00, 'y': 0.00}
         self.label_coord1Text = QLabel('좌측 상단 좌표   ==>')
-        self.label_coord1 = QLabel('({x}, {y})'.format(x = self.coord1['x'], y = self.coord1['y']))
+        self.label_coord1 = QLabel('({x:.2f}, {y:.2f})'.format(x = self.coord1['x'], y = self.coord1['y']))
         self.btn_coord1 = QPushButton('좌표 위치 설정')
 
-        self.coord2 = {'x': 0, 'y': 0}
+        self.coord2 = {'x': 0.00, 'y': 0.00}
         self.label_coord2Text = QLabel('우측 하단 좌표   ==>')
-        self.label_coord2 = QLabel('({x}, {y})'.format(x = self.coord2['x'], y = self.coord2['y']))
+        self.label_coord2 = QLabel('({x:.2f}, {y:.2f})'.format(x = self.coord2['x'], y = self.coord2['y']))
         self.btn_coord2 = QPushButton('좌표 위치 설정')
 
         # 페이지 수
@@ -47,6 +47,10 @@ class MainWindow(QMainWindow):
         self.input_filename = QLineEdit()
         self.input_filename.setPlaceholderText('파일명 입력')
 
+        # 파일 경로
+        self.saveDir = QLineEdit('~')
+        self.saveDir.setReadOnly(True)
+        self.btn_saveDir = QPushButton('저장 위치 선택')
 
         # 캡처 속도 조절
         self.captureSpeed = 0
@@ -58,6 +62,9 @@ class MainWindow(QMainWindow):
 
         # 캡처 시작 버튼
         self.btn_captureStart = QPushButton('캡처 시작')
+
+        # 초기화 버튼
+        self.btn_init = QPushButton('설정 초기화')
 
 
 
@@ -78,6 +85,7 @@ class MainWindow(QMainWindow):
         layout_coord2 = QHBoxLayout()
         layout_numPage = QHBoxLayout()
         layout_filename = QHBoxLayout()
+        layout_filedir = QHBoxLayout()
         layout_captureSpeed = QHBoxLayout()
 
 
@@ -105,12 +113,17 @@ class MainWindow(QMainWindow):
         layout_filename.addWidget(self.label_filename)
         layout_filename.addWidget(self.input_filename)
 
+        layout_main.addLayout(layout_filedir)
+        layout_filedir.addWidget(self.saveDir)
+        layout_filedir.addWidget(self.btn_saveDir)
+
         layout_main.addLayout(layout_captureSpeed)
         layout_captureSpeed.addWidget(self.label_captureSpeedText)
         layout_captureSpeed.addWidget(self.label_captureSpeed)
         layout_captureSpeed.addWidget(self.slider_captureSpeed)
 
         layout_main.addWidget(self.btn_captureStart)
+        layout_main.addWidget(self.btn_init)
 
         layout.addStretch()
 
@@ -121,29 +134,46 @@ class MainWindow(QMainWindow):
 
 
 ############################################시그널##############################################
-        self.btn_coord1.clicked.connect(self.set_coord1)
-        self.btn_coord2.clicked.connect(self.set_coord2)
+        self.btn_coord1.clicked.connect(lambda: self.set_coord1())
+        self.btn_coord2.clicked.connect(lambda: self.set_coord2())
         self.slider_captureSpeed.valueChanged.connect(self.set_captureSpeed)
+        self.btn_saveDir.clicked.connect(self.findDir)
         self.btn_captureStart.clicked.connect(self.captureStart)
+        self.btn_init.clicked.connect(self.init_settings)
 
 
 
 ############################################함수##############################################
-    def set_coord1(self):
-        coord = get_coord()
+    def set_coord1(self, x = None, y = None):
+        coord = {'x': x, 'y': y}
+        if x == None and y == None:
+            coord = get_coord()
         self.coord1 = coord
-        self.label_coord1.setText('({x:.2f}, {y:.2f})'.format(x = self.coord1['x'], y = self.coord1['y']))
+        self.label_coord1.setText('({x:.2f}, {y:.2f})'.format(x = coord['x'], y = coord['y']))
         
-    def set_coord2(self):
-        coord = get_coord()
+    def set_coord2(self, x = None, y = None):
+        coord = {'x': x, 'y': y}
+        if x == None and y == None:
+            coord = get_coord()
         self.coord2 = coord
-        self.label_coord2.setText('({x:.2f}, {y:.2f})'.format(x = self.coord2['x'], y = self.coord2['y']))
+        self.label_coord2.setText('({x:.2f}, {y:.2f})'.format(x = coord['x'], y = coord['y']))
 
     def set_captureSpeed(self):
         self.captureSpeed = self.slider_captureSpeed.value() / 10
         self.label_captureSpeed.setText('{}'.format(self.captureSpeed))
 
+    def findDir(self):
+        dir = QFileDialog.getExistingDirectory()
+        self.saveDir.setText(dir)
+        
+
     def captureStart(self):
+        # 페이지 수 미입력 시 경고   
+        try:
+            num_pages = int(self.input_numPage.text())
+        except ValueError as e:
+            return self.warning_numPage()
+           
         top = self.coord1['y']
         left = self.coord1['x']
         width = self.coord2['x'] - self.coord1['x']
@@ -151,8 +181,6 @@ class MainWindow(QMainWindow):
 
         # 캡처 위치 다시 클릭해주기
         pyautogui.click(left + width / 2, top + height / 2)
-
-        num_pages = int(self.input_numPage.text())
 
         for i in range(num_pages):
             with mss.mss() as sct:
@@ -180,6 +208,20 @@ class MainWindow(QMainWindow):
             pyautogui.press('right')
             if self.captureSpeed != 0:
                 time.sleep(self.captureSpeed)
+
+    # 페이지 수 입력 경고
+    def warning_numPage(self):
+        QMessageBox.warning(self, '페이지 수 확인 안됨', '총 페이지 수를 입력해주세요.')
+    
+    # 설정 초기화
+    def init_settings(self):
+        self.set_coord1(0, 0)
+        self.set_coord2(0, 0)
+        self.input_numPage.clear()
+        self.input_filename.clear()
+        self.saveDir.setText('~')
+        self.slider_captureSpeed.setValue(0)
+
 
 
 def get_coord():
